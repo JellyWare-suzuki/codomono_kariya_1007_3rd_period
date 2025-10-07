@@ -1,1 +1,211 @@
-この文字が見えていれば準備は完了しています。続きは当日の説明をお待ちください。
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <title>Ball Python Math Battle</title>
+  <style>
+    body {
+      margin: 0;
+      overflow: hidden;
+      background: black;
+      color: white;
+      font-family: sans-serif;
+    }
+    canvas {
+      display: block;
+      background: linear-gradient(to bottom, #001f3f, #000);
+    }
+    #score {
+      position: absolute;
+      top: 10px;
+      left: 10px;
+      font-size: 20px;
+    }
+  </style>
+</head>
+<body>
+<div id="score">スコア: 0</div>
+<canvas id="gameCanvas" width="800" height="600"></canvas>
+<script>
+const canvas = document.getElementById('gameCanvas');
+const ctx = canvas.getContext('2d');
+
+let player = {
+  x: 400,
+  y: 550,
+  width: 40,
+  height: 40,
+  speed: 5
+};
+
+let bullets = [];
+let problems = [];
+let score = 0;
+let lastTeleport = 0;
+
+function drawPlayer() {
+  ctx.fillStyle = '#8ED6FF';
+  ctx.beginPath();
+  ctx.arc(player.x, player.y, 20, 0, Math.PI * 2);
+  ctx.fill();
+  // 目を描く (ボールパイソン風)
+  ctx.fillStyle = 'black';
+  ctx.beginPath();
+  ctx.arc(player.x - 7, player.y - 5, 3, 0, Math.PI * 2);
+  ctx.arc(player.x + 7, player.y - 5, 3, 0, Math.PI * 2);
+  ctx.fill();
+}
+
+function fireBullet() {
+  bullets.push({ x: player.x, y: player.y - 20, speed: 7 });
+}
+
+function generateProblem() {
+  const a = Math.floor(Math.random() * 10);
+  const b = Math.floor(Math.random() * 10);
+  const answer = a + b;
+  const wrongAnswer = answer + (Math.random() < 0.5 ? 1 : -1);
+  const isCorrect = Math.random() < 0.5;
+
+  problems.push({
+    x: Math.random() * 760 + 20,
+    y: -30,
+    text: `${a} + ${b} = ${isCorrect ? answer : wrongAnswer}`,
+    correct: isCorrect,
+    speed: 1 + Math.random() * 1.5
+  });
+}
+
+function drawProblems() {
+  ctx.font = "20px Arial";
+  for (let p of problems) {
+    ctx.fillStyle = p.correct ? "#0f0" : "#f00";
+    ctx.fillText(p.text, p.x, p.y);
+  }
+}
+
+function drawBullets() {
+  ctx.fillStyle = 'yellow';
+  for (let b of bullets) {
+    ctx.beginPath();
+    ctx.arc(b.x, b.y, 5, 0, Math.PI * 2);
+    ctx.fill();
+  }
+}
+
+function teleport() {
+  const now = Date.now();
+  if (now - lastTeleport > 2000) { // 2秒クールダウン
+    player.x = Math.random() * (canvas.width - 40) + 20;
+    lastTeleport = now;
+  }
+}
+
+function spawnFirework(x, y) {
+  for (let i = 0; i < 20; i++) {
+    fireworks.push({
+      x: x,
+      y: y,
+      angle: Math.random() * 2 * Math.PI,
+      speed: Math.random() * 3 + 2,
+      life: 30
+    });
+  }
+}
+
+let fireworks = [];
+
+function updateFireworks() {
+  for (let f of fireworks) {
+    f.x += Math.cos(f.angle) * f.speed;
+    f.y += Math.sin(f.angle) * f.speed;
+    f.life--;
+  }
+  fireworks = fireworks.filter(f => f.life > 0);
+}
+
+function drawFireworks() {
+  for (let f of fireworks) {
+    ctx.fillStyle = `rgba(255, ${Math.random()*255}, 0, ${f.life / 30})`;
+    ctx.beginPath();
+    ctx.arc(f.x, f.y, 3, 0, Math.PI * 2);
+    ctx.fill();
+  }
+}
+
+function gameLoop() {
+  ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+  // プレイヤー描画
+  drawPlayer();
+
+  // 問題生成
+  if (Math.random() < 0.02) generateProblem();
+
+  // 問題描画＆移動
+  for (let p of problems) {
+    p.y += p.speed;
+  }
+
+  drawProblems();
+
+  // 弾移動
+  for (let b of bullets) {
+    b.y -= b.speed;
+  }
+
+  drawBullets();
+
+  // 当たり判定
+  for (let i = bullets.length - 1; i >= 0; i--) {
+    for (let j = problems.length - 1; j >= 0; j--) {
+      let b = bullets[i];
+      let p = problems[j];
+      if (Math.abs(b.x - p.x) < 40 && Math.abs(b.y - p.y) < 20) {
+        if (p.correct) {
+          score++;
+          spawnFirework(p.x, p.y);
+        } else {
+          score = Math.max(0, score - 1);
+        }
+        problems.splice(j, 1);
+        bullets.splice(i, 1);
+        break;
+      }
+    }
+  }
+
+  // スコア表示
+  document.getElementById('score').innerText = `スコア: ${score}`;
+
+  // 瞬間移動（Zキー）
+  if (keys['z']) teleport();
+
+  updateFireworks();
+  drawFireworks();
+
+  requestAnimationFrame(gameLoop);
+}
+
+let keys = {};
+
+document.addEventListener('keydown', (e) => {
+  keys[e.key.toLowerCase()] = true;
+  if (e.key === ' ') fireBullet();
+});
+document.addEventListener('keyup', (e) => {
+  keys[e.key.toLowerCase()] = false;
+});
+
+function handleMovement() {
+  if (keys['arrowleft']) player.x -= player.speed;
+  if (keys['arrowright']) player.x += player.speed;
+  player.x = Math.max(20, Math.min(canvas.width - 20, player.x));
+  requestAnimationFrame(handleMovement);
+}
+
+gameLoop();
+handleMovement();
+</script>
+</body>
+</html>
